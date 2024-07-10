@@ -47,7 +47,7 @@ export default function Main({ jwt }: MainProps) {
       : audioDeviceIdState;
 
   // sendAudio is used as a wrapper for the websocket to check the socket is finished init-ing before sending data
-  const sendAudio = (data: Blob) => {
+  const sendAudio = (data: Float32Array) => {
     if (
       rtSessionRef.current.rtSocketHandler &&
       rtSessionRef.current.isConnected()
@@ -59,34 +59,45 @@ export default function Main({ jwt }: MainProps) {
   // Memoise AudioRecorder so it doesn't get recreated on re-render
   const audioRecorder = useMemo(() => new AudioRecorder(sendAudio), []);
 
-  // Attach our event listeners to the realtime session
-  rtSessionRef.current.addListener('AddTranscript', (res) => {
-    setTranscription([...transcription, ...res.results]);
-    setPartial('');
-  });
+  useEffect(() => {
+    const handleAddTranscript = (res) => {
+      setTranscription([...transcription, ...res.results]);
+      setPartial('');      
+    };
 
-  rtSessionRef.current.addListener('AddPartialTranscript',(res) => {
-    let temp = "";
-    if (transcription.length) {
-      temp += " ";
-    }
-    setPartial(`${temp}${res.metadata.transcript}`);
-  });
+    const handleAddPartialTranscript = (res) => {
+      const temp = transcription.length ? ' ' : '';
+      setPartial(`${temp}${res.metadata.transcript}`);
+    };
 
-  // start audio recording once the websocket is connected
-  rtSessionRef.current.addListener('RecognitionStarted', async () => {
-    setSessionState('running');
-  });
+    const handleRecognitionStarted = async () => {
+      setSessionState('running');
+    };
 
-  rtSessionRef.current.addListener('EndOfTranscript', async () => {
-    setSessionState('configure');
-    await audioRecorder.stopRecording();
-  });
+    const handleEndOfTranscript = async () => {
+      setSessionState('configure');
+      await audioRecorder.stopRecording();
+    };
 
-  rtSessionRef.current.addListener('Error', async () => {
-    setSessionState('error');
-    await audioRecorder.stopRecording();
-  });
+    const handleError = async () => {
+      setSessionState('error');
+      await audioRecorder.stopRecording();
+    };
+
+    rtSessionRef.current.addListener('AddTranscript', handleAddTranscript);
+    rtSessionRef.current.addListener('AddPartialTranscript', handleAddPartialTranscript);
+    rtSessionRef.current.addListener('RecognitionStarted', handleRecognitionStarted);
+    rtSessionRef.current.addListener('EndOfTranscript', handleEndOfTranscript);
+    rtSessionRef.current.addListener('Error', handleError);
+
+    return () => {
+      rtSessionRef.current.removeListener('AddTranscript', handleAddTranscript);
+      rtSessionRef.current.removeListener('AddPartialTranscript', handleAddPartialTranscript);
+      rtSessionRef.current.removeListener('RecognitionStarted', handleRecognitionStarted);
+      rtSessionRef.current.removeListener('EndOfTranscript', handleEndOfTranscript);
+      rtSessionRef.current.removeListener('Error', handleError);
+    };
+  }, [transcription, audioRecorder]);
 
   // Call the start method on click to start the websocket
   const startTranscription = async () => {
@@ -107,7 +118,9 @@ export default function Main({ jwt }: MainProps) {
           enable_partials: true
         },
         audio_format: {
-          type: 'file',
+          type: 'raw',
+          encoding: 'pcm_f32le',
+          sample_rate: 48000
         },
       });
     } catch (err) {

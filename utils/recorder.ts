@@ -9,48 +9,56 @@ export class AudioRecorder {
   recorder: MediaRecorder;
   audioContext: AudioContext;
   mediaStreamSource: MediaStreamAudioSourceNode;
-  dataHandlerCallback?: (data: Blob) => void;
+  dataHandlerCallback?: (data: Float32Array) => void;
 
   // The data handler callback is called when audio data is available
   // It is used to send data to the websocket
-  constructor(dataHandlerCallback: (data: Blob) => void) {
+  constructor(dataHandlerCallback: (data: Float32Array) => void) {
     this.dataHandlerCallback = dataHandlerCallback;
   }
 
   async startRecording(deviceId: string) {
     const AudioContext = globalThis.window?.AudioContext;
     this.audioContext = new AudioContext({ sampleRate: SAMPLE_RATE_48K });
-
+  
     // We first check mic permissions in case they are explicitly denied
     if ((await getPermissions()) === 'denied') {
       throw new Error('Microphone permission denied.');
     }
-
-    // Here we set the sample rate and the deviceId that the user has selected
-    // If deviceId isn't set, then we get a default device (which is expected behaviour)
+  
+    // Set the sample rate and the deviceId that the user has selected
     const audio: MediaTrackConstraintSet = {
       sampleRate: SAMPLE_RATE_48K,
       deviceId,
     };
-
-    // Now we open and store the stream
+  
+    // Open and store the stream
     this.stream = await audioDevices.getUserMedia({ audio });
-
-    // Instantiate the MediaRecorder instance
-    this.recorder = new MediaRecorder(this.stream);
-
-    // This is the event listening function that gets called when data is available
-    this.recorder.ondataavailable = (event: BlobEvent) => {
-      this.dataHandlerCallback?.(event.data);
+  
+    // Create a MediaStreamAudioSourceNode from the stream
+    const source = this.audioContext.createMediaStreamSource(this.stream);
+  
+    // Create a ScriptProcessorNode to capture audio data
+    const bufferSize = 4096; // Choose an appropriate buffer size
+    const scriptProcessor = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
+  
+    source.connect(scriptProcessor);
+    scriptProcessor.connect(this.audioContext.destination); // Connect to destination if needed for processing
+  
+    scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
+      const inputBuffer = audioProcessingEvent.inputBuffer;
+      const outputBuffer = audioProcessingEvent.outputBuffer;
+  
+      // Get the raw audio data
+      const inputData = inputBuffer.getChannelData(0);  
+      // Send the pcm_f32le data
+      this.dataHandlerCallback?.(inputData);
     };
-
-    // Start recording from the device
-    // The number passed in indicates how frequently in milliseconds ondataavailable will be called
-    this.recorder.start(500);
-
+  
     // return the sample rate
     return { sampleRate: this.audioContext.sampleRate };
   }
+  
 
   // stopRecording is called when the session ends
   // It shuts down the stream and recorder and sets all properties to null

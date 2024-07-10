@@ -2,7 +2,7 @@
   "name": "speechmatics-mic-demo",
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev --port 85",
+    "dev": "next dev --port 80",
     "build": "next build",
     "lint": "next lint",
     "format": "npx biome format .",
