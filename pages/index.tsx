@@ -70,6 +70,14 @@ export default function Main({ jwt }: MainProps) {
       setPartial(`${temp}${res.metadata.transcript}`);
     };
 
+    const handleAddTranslation = (res) => {
+      console.log(res);
+    }
+
+    const handleAddPartialTranslation = (res) => {
+      console.log(res);
+    }
+
     const handleRecognitionStarted = async () => {
       setSessionState('running');
     };
@@ -86,6 +94,8 @@ export default function Main({ jwt }: MainProps) {
 
     rtSessionRef.current.addListener('AddTranscript', handleAddTranscript);
     rtSessionRef.current.addListener('AddPartialTranscript', handleAddPartialTranscript);
+    rtSessionRef.current.addListener('AddTranslation', handleAddTranslation);
+    rtSessionRef.current.addListener('AddPartialTranslation', handleAddPartialTranslation);
     rtSessionRef.current.addListener('RecognitionStarted', handleRecognitionStarted);
     rtSessionRef.current.addListener('EndOfTranscript', handleEndOfTranscript);
     rtSessionRef.current.addListener('Error', handleError);
@@ -93,6 +103,7 @@ export default function Main({ jwt }: MainProps) {
     return () => {
       rtSessionRef.current.removeListener('AddTranscript', handleAddTranscript);
       rtSessionRef.current.removeListener('AddPartialTranscript', handleAddPartialTranscript);
+      rtSessionRef.current.removeListener('AddTranslation', handleAddTranslation);
       rtSessionRef.current.removeListener('RecognitionStarted', handleRecognitionStarted);
       rtSessionRef.current.removeListener('EndOfTranscript', handleEndOfTranscript);
       rtSessionRef.current.removeListener('Error', handleError);
@@ -115,6 +126,10 @@ export default function Main({ jwt }: MainProps) {
           max_delay: 2, 
           language: 'en', 
           operating_point:"enhanced",
+          enable_partials: true
+        },
+        translation_config: {
+          target_languages: ["es"],
           enable_partials: true
         },
         audio_format: {
